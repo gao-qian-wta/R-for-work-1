@@ -1,0 +1,92 @@
+
+# 1.
+# (1)
+library(ISLR)
+library(ggplot2)
+View(Default)
+sum_nodebt <- sum(Default$default == "No")
+sum_yesdebt <- sum(Default$default == "Yes")
+ratio_debt = sum_yesdebt / (sum_nodebt + sum_yesdebt)
+ratio_debt
+# (2)
+#违约与否会与是否为学生，信用卡中的余额和收入有关，人群不同，会直接影响还款能力
+
+# (3)  一元分析
+default_NEW <- sub("No", 0, Default$default)
+default_NEW <- as.numeric(sub("Yes", 1, default_NEW))
+student_NEW <- sub("No", 0, Default$student)
+student_NEW <- as.numeric(sub("Yes", 1, student_NEW))
+balance_NEW <- Default$balance
+income_NEW <- Default$income
+Default_NEW <- data.frame(default_NEW, student_NEW, balance_NEW, income_NEW)
+lm_defal_debt = lm(formula = default_NEW ~ student_NEW + balance_NEW + income_NEW , data = Default_NEW)
+summary(lm_defal_debt)
+
+# (4)  多元分析
+glm_defal_debt <- glm(formula = default_NEW ~ student_NEW + balance_NEW + income_NEW , data = Default_NEW, family = binomial(link = "logit"))
+summary(glm_defal_debt)
+coe_inc5000 <- coef(glm_defal_debt)
+# (5)
+
+#defal_coe <- coef(glm_defal_debt) # 提取拟合模型系数
+#defal_probit <- dnorn(defal_coe)
+pre_defal <- predict(glm_defal_debt, newdata = data.frame(student_NEW = 1, balance_NEW = 2500, income_NEW = 50000))
+predict_inc5000 <- dnorm((coe_inc5000[2]*1)+(coe_inc5000[3]*2500)+(coe_inc5000[4]*50000))
+
+# (6) 训练集和测试集按照7:3划分
+set.seed(10000)
+length(Default_NEW[,1])
+sub_dev <- sample(1:nrow(Default_NEW),round(nrow(Default_NEW)*(7/10)))
+train_set <- Default_NEW[sub_dev,]#取7/10的数据做训练集
+test_set <- Default_NEW[-sub_dev,]#取3/10的数据做测试集
+
+defal_train_logit <- glm(formula = train_set$default_NEW ~ train_set$student_NEW + train_set$balance_NEW + train_set$income_NEW, data = train_set, family = binomial(link = "logit"))
+summary(defal_train_logit)
+# predict.glm(defal_train_logit, newdata = data.frame(train_set$default_NEW.train_set$student_NEW, train_set$balance_NEW, train_set$income_NEW))
+logit.pred <- predict(defal_train_logit, train_set, type = "response")
+logit.class <- rep(0, nrow(train_set))
+logit.class[logit.pred > 0.5 ] <- 1 #阈值设?0.5
+table(logit.class, train_set$default_NEW, dnn = c( "Prediction" , "Actual"))
+mean(logit.class != train_set$default_NEW)
+# 2.
+# (1) LDA模型 预测 default包
+library(MASS)
+lda.fit <- lda(default_NEW ~ student_NEW+balance_NEW+income_NEW , data = train_set)
+lda.fit
+plot(lda.fit)
+lda.pred <- predict(lda.fit, train_set)
+names(lda.pred)
+lda.class <- lda.pred$class
+table(lda.class, train_set$default_NEW, dnn = c("Prediction", "Actual"))
+mean(lda.class != train_set$default_NEW)
+
+# test_pred <- predict(lda.fit, newdata = data.frame(test_set$student_NEW, test_set$balance_NEW, test_set$income_NEW))
+# (2)
+qda.fit <- qda(default_NEW ~ student_NEW+balance_NEW+income_NEW , data = train_set)
+qda.fit
+
+qda.pred <- predict(qda.fit, train_set)
+names(lda.pred)
+qda.class <- qda.pred$class
+table(qda.class, train_set$default_NEW, dnn = c("Prediction", "Actual"))
+mean(qda.class != train_set$default_NEW)
+
+# (3)
+logit.pred2 <- predict (defal_train_logit, train_set, type = "response" )
+lda.pred2 <- predict ( lda.fit , train_set ) $ posterior [ , 2]
+qda.pred2 <- predict ( qda.fit , train_set ) $ posterior [ , 2]
+library ( ROCR )
+rocplot <- function ( pred , truth , ... ) {
+  predob <- prediction ( pred , truth )
+  perf <- performance ( predob , "tpr", "fpr" )
+  plot ( perf , ... )
+  auc <- performance ( predob , "auc" )
+  auc <- unlist ( slot ( auc , "y.values" ) )
+  auc <- round ( auc , 4 ) #保留4位小数
+  text ( x = 0.8 , y = 0.1 , labels = paste ( "AUC =" , auc ) )
+}
+par ( mfrow = c (2 , 2) )
+y <- train_set$default_NEW
+rocplot ( logit.pred2 , y , main = "Logit" )
+rocplot ( lda.pred2 , y , main = "LDA" )
+rocplot ( qda.pred2 , y , main = "QDA" )
