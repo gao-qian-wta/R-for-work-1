@@ -1,0 +1,50 @@
+library("ISLR")
+library("MASS")
+library("lmPerm")
+library("boot")
+
+
+# 1.
+# (1)
+# 5-fold cross validation
+
+set.seed(3)
+glm_mpg <- glm(mpg ~ horsepower, data = Auto)
+cv.err1 <- cv.glm(Auto, glm_mpg, K = 5)
+cv.err1 $ delta
+
+# (2)
+#   leave one out cross validation
+set.seed(3)
+glm_mpg <- glm(mpg ~ horsepower + I(horsepower^2) + I(horsepower^3), data = Auto)
+cv.err2 <- cv.glm(Auto, glm_mpg)
+cv.err2 $ delta
+
+# 2.
+# (1)
+medv_avr <- mean(Boston$medv)
+medv_avr
+medv_gl <- glm(formula = lstat ~ ., data = Boston)
+summary(medv_gl)
+
+#boot.f <- function(data){
+#  new_bos <- sample(data, 10000, replace = T)
+#  return(sd(new_bos$medv))
+#}
+#boot.f(Boston)
+
+# (2)
+boot.f <- function ( data , index ){
+  fit <- lm ( lstat ~ . , data = data , subset = index )
+  return ( coef ( fit ) )
+}
+boot.f ( Boston , 1 : 506 )
+set.seed ( 4 )
+boot.f ( Boston , sample ( 506 , 506 , replace = T ) )
+boot ( Boston , boot.f , 1000 )
+fit <- lm ( lstat ~ . , data = Boston )
+summary ( fit ) $ coef
+
+# (3)
+medv_avr_sd <- median(mean(Boston$medv))
+medv_avr_sd
