@@ -1,0 +1,116 @@
+library(MASS)
+library (ncvreg)
+names(Boston)
+dim(Boston)
+library(glmnet)
+library(leaps)
+
+# 1.
+
+# (1)
+# x <- data.frame(Boston-Boston$medv)
+# x$medv <- NULL
+# y <- data.frame(Boston $ medv)
+xx <- as.matrix (Boston[ , 1 : 13])
+yy <- Boston $ medv 
+
+# LASSO penalty
+fit1 <- cv.glmnet (xx, yy, family = "gaussian")
+beta_fit1 <- coef (fit1) # 提取参数的估计值
+beta_fit1
+resid1 <- (xx %*% beta_fit1 [-1] + beta_fit1 [1] - yy)
+MSE1 <- sum (resid1 ^ 2) # 计算残差平方和
+MSE1
+# 运行结果得到 indus, age, rad, tax不是影响因素
+
+# MCP penalty
+fit2 <- cv.ncvreg (xx, yy, family = "gaussian")
+fit.mcp <- fit2 $ fit
+beta.fit2 <- fit.mcp $ beta [ , fit2 $ min] # 提取参数的估计值
+round(beta.fit2, 3) # 保留三位小数
+resid2 <- (xx %*% beta.fit2[-1] + beta.fit2[1] - yy)
+MSE2 <- sum(resid2^2) # 计算残差平方和
+MSE2
+# 运行结果得到 indus, age不是影响因素，而black, tax的影响因素小
+
+# SCAD penalty
+fit3 <- cv.ncvreg (xx, yy, family = "gaussian", penalty = "SCAD")
+fit.scad <- fit3 $ fit
+beta.fit3 <- fit.scad $ beta [ , fit3 $ min] # 提取参数的估计值
+round( beta.fit3, 3) # 保留三位小数
+resid3 <- (xx %*% beta.fit3[-1] + beta.fit3[1] - yy)
+MSE3 <- sum(resid3^2) # 计算残差平方和
+MSE3
+# 运行结果与MCP惩罚得到的结果相同
+
+# (2)
+
+# 向前逐步选择
+subset.fwd <- regsubsets(medv~., Boston, nvmax = 17, method = "forward")
+summary(subset.fwd)
+# 向前逐步选择结果显示最不明显的影响因素为 indus, age, tax
+
+# 向后逐步选择法
+subset.fwd <- regsubsets(medv~., Boston, nvmax = 17, method = "backward")
+summary(subset.fwd)
+# 向前逐步选择结果显示最不明显的影响因素为 indus, chas, age 
+
+# 经比较，选择出相同的无关影响因素有 indus , age , tax(有较大可能)
+
+# 2.
+library(ISLR)
+View(Smarket)
+x_s <- as.matrix (Smarket[ , 1 : 8])
+y_s <- ifelse(Smarket$Direction != "Down", 1, 0)
+# todo 改变nv.函数中的惩罚模型为logistic
+
+# LASSO penalty
+fit_sl <- cv.glmnet (x_s, y_s, family = "binomial")
+beta_fit_s <- coef (fit_sl) # 提取参数的估计值
+beta_fit_s
+
+# MCP penalty
+fit_sm <- cv.ncvreg (x_s, y_s, family = "binomial")
+fit.mcp_s <- fit_sm $ fit
+beta.fit_sm <- fit.mcp_s $ beta [ , fit_sm $ min] # 提取参数的估计值
+round(beta.fit_sm, 3) # 保留三位小数
+
+
+#SCAD penalty
+fit_sc <- cv.ncvreg (x_s, y_s, family = "gaussian", penalty = "SCAD")
+fit.scad_sc <- fit_sc $ fit
+beta.fit_sc <- fit.scad_sc $ beta [ , fit_sc $ min] # 提取参数的估计值
+round( beta.fit_sc, 3) # 保留三位小数
+
+# 由结果可知，三种惩罚所选影响因素结果相同
+
+# 3.
+
+library(tmvtnorm)
+a <- c(1,0.1,0.5,0.1,1,0.9,0.5,0.9,1)
+sigma <- matrix(a, nrow = 3, byrow = TRUE)
+b <- c(0,0,0)
+x <- rmvnorm(n = 100, mean = b, sigma = sigma)
+beta <- c (1, 0.5, 0)
+
+View(beta)
+y <- x %*% beta + rnorm(100, mean = 0)     # rmvnorm (n = 1000, mean = c(0,0))
+
+# LASSO
+library (glmnet)
+fit1 <- cv.glmnet (x, y, family = "gaussian")
+beta.fit1 <- coef (fit1) # 提取参数的估计值
+beta.fit1
+
+# MCP
+library (ncvreg)
+fit2 <- cv.ncvreg (x, y, family = "gaussian")
+fit.mcp <- fit2$fit
+beta.fit2 <- fit.mcp$beta [ , fit2$min] # 提取参数的估计值
+round (beta.fit2, 3) # 保留三位小数
+
+# SCAD
+fit3 <- cv.ncvreg (x, y, family = "gaussian", penalty = "SCAD")
+fit.scad <- fit3$fit
+beta.fit3 <- fit.scad$beta [ , fit3$min] # 提取参数的估计值
+round (beta.fit3, 3) # 保留三位小数
